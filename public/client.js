@@ -94,6 +94,37 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+
+function ensureChunksInView(){
+  // Determine world-space corners of the canvas and request any missing chunks
+  const corners = [
+    screenToWorld(0,0),
+    screenToWorld(canvas.width,0),
+    screenToWorld(canvas.width,canvas.height),
+    screenToWorld(0,canvas.height)
+  ];
+  const ar = corners.map(p => pixelToAxial(p.x, p.y, state.hexRadius, {x:0,y:0}));
+  const qMin = Math.min(...ar.map(a=>a.q)) - 1;
+  const qMax = Math.max(...ar.map(a=>a.q)) + 1;
+  const rMin = Math.min(...ar.map(a=>a.r)) - 1;
+  const rMax = Math.max(...ar.map(a=>a.r)) + 1;
+
+  const cqMin = Math.floor(qMin / CHUNK.W);
+  const cqMax = Math.floor(qMax / CHUNK.W);
+  const crMin = Math.floor(rMin / CHUNK.H);
+  const crMax = Math.floor(rMax / CHUNK.H);
+
+  for (let cr=crMin; cr<=crMax; cr++){
+    for (let cq=cqMin; cq<=cqMax; cq++){
+      const key = ck(cq,cr);
+      if (!state.loadedChunks.has(key)){
+        state.loadedChunks.add(key);
+        ioClient.emit('chunk:request', { cq, cr });
+      }
+    }
+  }
+}
+
 // --- render
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
