@@ -78,46 +78,21 @@ canvas.addEventListener('wheel', (e) => {
   render();
 }, { passive:false });
 
-let isPanning = false; let last = {x:0,y:0};
-canvas.addEventListener('mousedown', (e)=>{ isPanning = true; last = {x:e.clientX, y:e.clientY}; });
-window.addEventListener('mouseup', ()=>{ isPanning = false; });
-window.addEventListener('mousemove', (e)=>{
-  if (!isPanning) return;
-  const dx = e.clientX - last.x, dy = e.clientY - last.y;
-  state.origin.x += dx; state.origin.y += dy;
-  last = {x:e.clientX, y:e.clientY};
-  ensureChunksInView();
-  render();
-});
-
-function ensureChunksInView(){
-  const corners = [
-    screenToWorld(0,0), 
-    screenToWorld(canvas.width,0),
-    screenToWorld(canvas.width,canvas.height),
-    screenToWorld(0,canvas.height)
-  ];
-  const ar = corners.map(p => pixelToAxial(p.x, p.y, state.hexRadius, {x:0,y:0}));
-  const qMin = Math.min(...ar.map(a=>a.q)) - 1;
-  const qMax = Math.max(...ar.map(a=>a.q)) + 1;
-  const rMin = Math.min(...ar.map(a=>a.r)) - 1;
-  const rMax = Math.max(...ar.map(a=>a.r)) + 1;
-
-  const cqMin = Math.floor(qMin / CHUNK.W);
-  const cqMax = Math.floor(qMax / CHUNK.W);
-  const crMin = Math.floor(rMin / CHUNK.H);
-  const crMax = Math.floor(rMax / CHUNK.H);
-
-  for (let cr=crMin; cr<=crMax; cr++){
-    for (let cq=cqMin; cq<=cqMax; cq++){
-      const key = ck(cq,cr);
-      if (!state.loadedChunks.has(key)){
-        state.loadedChunks.add(key);
-        ioClient.emit('chunk:request', { cq, cr });
-      }
-    }
+// --- keyboard pan (arrow keys)
+const PAN_STEP = 50; // pixels at scale=1
+window.addEventListener('keydown', (e) => {
+  const k = e.key; // 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown'
+  if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowDown') {
+    e.preventDefault(); // stop page from scrolling
+    const step = (e.shiftKey ? 3 : 1) * PAN_STEP;
+    if (k === 'ArrowLeft')  state.origin.x += step;      // camera left => world right
+    if (k === 'ArrowRight') state.origin.x -= step;      // camera right => world left
+    if (k === 'ArrowUp')    state.origin.y += step;      // camera up => world down
+    if (k === 'ArrowDown')  state.origin.y -= step;      // camera down => world up
+    ensureChunksInView();
+    render();
   }
-}
+});
 
 // --- render
 function render() {
@@ -217,6 +192,5 @@ function mouseToWorld(e) {
 }
 function worldToScreen({x,y}) { return { x: x*state.scale + state.origin.x, y: y*state.scale + state.origin.y }; }
 function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
-
 
 render();

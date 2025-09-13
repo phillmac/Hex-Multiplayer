@@ -77,9 +77,9 @@ const GAME = {
   tps: 10
 };
 
-const CHUNK_W = 24;     // axial-rect
+const CHUNK_W = 24;
 const CHUNK_H = 24;
-const FEATURE_STRIDE = 64; // supercells for feature seeds (lakes)
+const FEATURE_STRIDE = 64; // supercells for lake seeds
 
 // cache
 const chunkCache = new Map();     // "cq,cr" -> { tiles: Tile[] }
@@ -95,33 +95,31 @@ function rngSeeded(a,b){ // 2D hash -> uint
   return (t ^ (t>>>14))>>>0;
 }
 function randUnit(a,b){ return rngSeeded(a,b) / 0xFFFFFFFF; }
-function randRangeInt(a,b,c,d){ // integer in [c,d], hashed by (a,b)
-  const u = randUnit(a,b); return c + Math.floor(u * (d-c+1)); }
+function randRangeInt(a,b,c,d){ const u = randUnit(a,b); return c + Math.floor(u * (d-c+1)); }
 
-// value-ish noise from axial coords (q,r)
+// value-ish noise
 function valueNoise(q,r,scale=32){
   const x = q/scale, y = r/scale;
   const x0 = Math.floor(x), y0 = Math.floor(y);
   const x1 = x0+1, y1 = y0+1;
   const sx = x - x0, sy = y - y0;
   function v(ix,iy){ return randUnit(ix,iy); }
-  const n0 = lerp(v(x0,y0), v(x1,y0), smoothstep(sx));
-  const n1 = lerp(v(x0,y1), v(x1,y1), smoothstep(sx));
-  return lerp(n0, n1, smoothstep(sy)); // [0,1]
+  const smooth = t => t*t*(3-2*t);
+  const lerp = (a,b,t) => a + (b-a)*t;
+  const n0 = lerp(v(x0,y0), v(x1,y0), smooth(sx));
+  const n1 = lerp(v(x0,y1), v(x1,y1), smooth(sx));
+  return lerp(n0, n1, smooth(sy)); // [0,1]
 }
-function smoothstep(t){ return t*t*(3-2*t); }
-function lerp(a,b,t){ return a + (b-a)*t; }
 
-// multi-octave terrain elevation ~[0,1]
+// elevation ~[0,1]
 function elevation(q,r){
   const n1 = valueNoise(q,r,48);
   const n2 = valueNoise(q+1000,r-1000,24);
   const n3 = valueNoise(q-777,r+333,12);
-  let e = 0.6*n1 + 0.3*n2 + 0.1*n3;
-  return e; // 0..1
+  return 0.6*n1 + 0.3*n2 + 0.1*n3;
 }
 
-// Lake feature centers per FEATURE_STRIDE cell
+// Lake centers per FEATURE_STRIDE cell
 function lakeCentersForFeatureCell(fq, fr){
   const count = randRangeInt(fq*2+17, fr*3-9, 0, 2);
   const centers = [];
@@ -136,7 +134,7 @@ function lakeCentersForFeatureCell(fq, fr){
   return centers;
 }
 
-// BFS growth to produce a lake cell set of given size
+// expand a lake by deterministic BFS
 function lakeCells(center, maxCells){
   const visited = new Set([key(center.q, center.r)]);
   const cells = [{q:center.q, r:center.r}];
@@ -172,13 +170,15 @@ function lakesAffectingChunk(cq, cr){
   for (let fq=fQMin; fq<=fQMax; fq++){
     for (let fr=fRMin; fr<=fRMax; fr++){
       const centers = lakeCentersForFeatureCell(fq, fr);
-      for (const c of centers){
-        const cells = lakeCells(c, c.size);
-        lakeSets.push({ center:c, cells });
-      }
+      for (const c of centers) lakeSets.push({ center:c, cells: lakeCells(c, c.size) });
     }
   }
   return lakeSets;
+}
+
+function axialDist(q1,r1,q2,r2){
+  const s1 = -q1 - r1, s2 = -q2 - r2;
+  return Math.max(Math.abs(q1-q2), Math.abs(r1-r2), Math.abs(s1-s2));
 }
 
 function riversForChunk(cq, cr, lakeSets){
@@ -187,11 +187,7 @@ function riversForChunk(cq, cr, lakeSets){
   const rMin = cr*CHUNK_H, rMax = rMin + CHUNK_H - 1;
 
   function isLake(q,r){
-    for (const ls of lakeSets){
-      for (const c of ls.cells){
-        if (c.q===q && c.r===r) return true;
-      }
-    }
+    for (const ls of lakeSets){ for (const c of ls.cells){ if (c.q===q && c.r===r) return true; } }
     return false;
   }
   function nearestLakeCenter(q,r){
@@ -234,14 +230,10 @@ function riversForChunk(cq, cr, lakeSets){
   return rivers;
 }
 
-function axialDist(q1,r1,q2,r2){
-  const s1 = -q1 - r1, s2 = -q2 - r2;
-  return Math.max(Math.abs(q1-q2), Math.abs(r1-r2), Math.abs(s1-s2));
-}
-
 function key(q, r) { return `${q},${r}`; }
 function chunkKey(cq, cr){ return `${cq},${cr}`; }
 
+// Generate chunk deterministically
 function generateChunk(cq, cr){
   const ck = chunkKey(cq,cr);
   const cached = chunkCache.get(ck);

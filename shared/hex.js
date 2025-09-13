@@ -54,11 +54,7 @@ export function neighborsAxial(q, r) {
   return dirs.map(d => ({ q: q + d.dq, r: r + d.dr }));
 }
 
-// Chunk math helpers
+// Chunk math helpers (client uses for viewport -> chunks)
 export const CHUNK = { W: 24, H: 24 };
-export function floorDiv(n, d){
-  return Math.floor(n / d);
-}
-export function chunkFor(q, r){
-  return { cq: floorDiv(q, CHUNK.W), cr: floorDiv(r, CHUNK.H) };
-}
+export function floorDiv(n, d){ return Math.floor(n / d); }
+export function chunkFor(q, r){ return { cq: floorDiv(q, CHUNK.W), cr: floorDiv(r, CHUNK.H) }; }
