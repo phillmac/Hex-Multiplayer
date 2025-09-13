@@ -1,0 +1,15 @@
+:root {
+  --bg: #0f1116;
+  --panel: #171a21;
+  --text: #e6e8ef;
+  --accent: #6aa3ff;
+  --water: #123a5a; /* lake */
+  --river: #1b4f7a; /* river */
+}
+* { box-sizing: border-box; }
+html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family: system-ui, Segoe UI, Roboto, sans-serif; }
+header { display:flex; align-items:center; gap:1rem; padding:0.75rem 1rem; background:var(--panel); border-bottom:1px solid #232833; flex-wrap: wrap; }
+h1 { font-size:1.1rem; margin:0; opacity:.9; }
+#hud { display:flex; gap:1rem; font-size:.9rem; opacity:.9; flex-wrap: wrap; }
+#board { display:block; margin: 0 auto; background: #0c0f14; }
+.tag { padding: 0.15rem 0.5rem; border-radius: 999px; background:#22283a; }
